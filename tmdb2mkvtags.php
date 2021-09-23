@@ -47,13 +47,16 @@ if ($apiToken === null) {
     );
     exit(2);
 }
+if ($includeAdult === null) {
+    $includeAdult = 'true';
+}
 
 
 $movies = queryTmdb(
     '/3/search/movie'
     . '?query=' . urlencode($title)
     . '&language=' . urlencode($language)
-    . '&include_adult=1'
+    . '&include_adult=' . urlencode($includeAdult)
 );
 
 if ($movies->total_results == 0) {
@@ -108,7 +111,7 @@ if ($movies->total_results == 0) {
             '/3/search/movie'
             . '?query=' . urlencode($title)
             . '&language=' . urlencode($language)
-            . '&include_adult=1'
+            . '&include_adult=' . urlencode($includeAdult)
             . '&page=' . $page
         );
     } while (true);
