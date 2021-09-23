@@ -209,6 +209,7 @@ $crewMap = [
     'Screenplay'              => 'WRITTEN_BY',
     'Sound'                   => 'COMPOSER',
     'Theme Song Performance'  => 'LEAD_PERFORMER',
+    'Writer'                  => 'WRITTEN_BY',
 ];
 foreach ($credits->crew as $crewmate) {
     if (isset($crewMap[$crewmate->job])) {
