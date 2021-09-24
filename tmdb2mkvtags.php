@@ -11,6 +11,10 @@
  * @link    https://www.matroska.org/technical/tagging.html
  * @link    https://developers.themoviedb.org/3/
  */
+
+require_once("MkvTagXMLWriter.php");
+require_once("commonTmdb.php");
+
 if ($argc < 3) {
     fwrite(STDERR, "Usage: tmdb2mkvtags.php LANGUAGE \"MOVIE TITLE\" [OUTDIR]\n");
     exit(1);
@@ -198,25 +202,11 @@ if ($language != $movie->original_language) {
 foreach ($credits->cast as $actor) {
     $xml->actor($actor->name, $actor->character, $language);
 }
-
-//map tmdb job to matroska tags
-$crewMap = [
-    'Art Direction'           => 'ART_DIRECTOR',
-    'Costume Design'          => 'COSTUME_DESIGNER',
-    'Director of Photography' => 'DIRECTOR_OF_PHOTOGRAPHY',
-    'Director'                => 'DIRECTOR',
-    'Editor'                  => 'EDITED_BY',
-    'Novel'                   => 'WRITTEN_BY',
-    'Original Music Composer' => 'COMPOSER',
-    'Producer'                => 'PRODUCER',
-    'Screenplay'              => 'WRITTEN_BY',
-    'Sound'                   => 'COMPOSER',
-    'Theme Song Performance'  => 'LEAD_PERFORMER',
-    'Writer'                  => 'WRITTEN_BY',
-];
 foreach ($credits->crew as $crewmate) {
     if (isset($crewMap[$crewmate->job])) {
         $xml->simple($crewMap[$crewmate->job], $crewmate->name);
+    //} else {
+    //    fwrite(STDERR, "Unknown crew mapping: " . $crewmate->job . "\n");
     }
 }
 
@@ -283,74 +273,4 @@ if ($outdir !== '-') {
 //var_dump($movie, $details);
 
 
-function queryTmdb($path)
-{
-    global $apiToken;
-
-    $url = 'https://api.themoviedb.org/' . $path;
-    $ctx = stream_context_create(
-        [
-            'http' => [
-                'timeout'       => 5,
-                'ignore_errors' => true,
-                'header'        => 'Authorization: Bearer ' . $apiToken
-            ]
-        ]
-    );
-    $res = file_get_contents($url, false, $ctx);
-    list(, $statusCode) = explode(' ', $http_response_header[0]);
-    $data = json_decode($res);
-
-    if ($statusCode != 200) {
-        if (isset($data->status_code) && isset($data->status_message)) {
-            throw new Exception(
-                'API error: ' . $data->status_code . ' ' . $data->status_message
-            );
-        }
-        throw new Exception('Error querying API: ' . $statusCode, $statusCode);
-    }
-    return $data;
-}
-
-class MkvTagXMLWriter extends XMLWriter
-{
-    public function actor($actorName, $characterName)
-    {
-        $this->startElement('Simple');
-        $this->startElement('Name');
-        $this->text('ACTOR');
-        $this->endElement();
-        $this->startElement('String');
-        $this->text($actorName);
-        $this->endElement();
-        $this->simple('CHARACTER', $characterName);
-        $this->endElement();//Simple
-    }
-
-    public function simple($key, $value, $language = null)
-    {
-        $this->startElement('Simple');
-        $this->startElement('Name');
-        $this->text($key);
-        $this->endElement();
-        $this->startElement('String');
-        $this->text($value);
-        $this->endElement();
-        if ($language) {
-            $this->startElement('TagLanguage');
-            $this->text($language);
-            $this->endElement();
-        }
-        $this->endElement();
-    }
-
-    public function targetType($value)
-    {
-        $this->startElement('Targets');
-        $this->startElement('TargetType');
-        $this->text($value);
-        $this->endElement();
-        $this->endElement();
-    }
-}
 ?>
