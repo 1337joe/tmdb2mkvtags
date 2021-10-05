@@ -5,5 +5,7 @@
  * Get the "API token v4" from https://www.themoviedb.org/settings/api
  */
 $apiToken = 'FIXME';
-$includeAdult = 'true';
+$includeAdult = 'true'; // intentionally a string - used in url query
+$imageSizeOriginal = false;
+$allImages = false';
 ?>

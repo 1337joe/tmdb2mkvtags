@@ -54,6 +54,12 @@ if ($apiToken === null) {
 if ($includeAdult === null) {
     $includeAdult = 'true';
 }
+if ($imageSizeOriginal === null) {
+    $imageSizeOriginal = false;
+}
+if ($allImages === null) {
+    $allImages = false;
+}
 
 
 $movies = queryTmdb(
@@ -223,40 +229,78 @@ if ($outdir === null) {
 
 
 if ($downloadImages) {
-    //we take the largest scaled image, not the original image
     $tmdbConfig = queryTmdb('3/configuration');
-    foreach ($tmdbConfig->images as $key => $sizes) {
-        if (is_array($sizes)) {
-            foreach ($sizes as $sizeKey => $value) {
-                if ($value == 'original') {
-                    unset($tmdbConfig->images->$key[$sizeKey]);
+
+    if (!$imageSizeOriginal) {
+        // we take the largest scaled image, not the original image
+        foreach ($tmdbConfig->images as $key => $sizes) {
+            if (is_array($sizes)) {
+                foreach ($sizes as $sizeKey => $value) {
+                    if ($value == 'original') {
+                        unset($tmdbConfig->images->$key[$sizeKey]);
+                    }
                 }
             }
         }
     }
 
-    if ($details->poster_path) {
-        $size = $tmdbConfig->images->poster_sizes[
-            array_key_last($tmdbConfig->images->poster_sizes)
-        ];
-        $url = $tmdbConfig->images->secure_base_url . $size . $details->poster_path;
-        $imagePath = $outdir
-            . 'cover.' . pathinfo($details->poster_path, PATHINFO_EXTENSION);
-        if (!file_exists($imagePath)) {
-            file_put_contents($imagePath, file_get_contents($url));
+    // adding language to query excludes results without a language set
+    $movieImages = queryTmdb('3/movie/' . $movie->id . '/images');
+
+    // exclude images that have a language that doesn't match $language
+    foreach ($movieImages as $type => $images) {
+        if (is_array($images)) {
+            foreach ($images as $key => $image) {
+                if ($image->iso_639_1 && $image->iso_639_1 != $language) {
+                    unset($images[$key]);
+                }
+            }
+            $movieImages->$type = array_values($images);
         }
     }
 
-    if ($details->backdrop_path) {
-        $size = $tmdbConfig->images->backdrop_sizes[
-            array_key_last($tmdbConfig->images->backdrop_sizes)
-        ];
-        $url = $tmdbConfig->images->secure_base_url
-            . $size . $details->backdrop_path;
+    $size = $tmdbConfig->images->poster_sizes[
+        array_key_last($tmdbConfig->images->poster_sizes)
+    ];
+    foreach ($movieImages->posters as $i => $image) {
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
         $imagePath = $outdir
-            . 'backdrop.' . pathinfo($details->poster_path, PATHINFO_EXTENSION);
+            . 'poster' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
         if (!file_exists($imagePath)) {
             file_put_contents($imagePath, file_get_contents($url));
+        }
+        if (!$allImages) {
+            break;
+        }
+    }
+
+    $size = $tmdbConfig->images->logo_sizes[
+        array_key_last($tmdbConfig->images->logo_sizes)
+    ];
+    foreach ($movieImages->logos as $i => $image) {
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
+        $imagePath = $outdir
+            . 'logo' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
+        if (!file_exists($imagePath)) {
+            file_put_contents($imagePath, file_get_contents($url));
+        }
+        if (!$allImages) {
+            break;
+        }
+    }
+
+    $size = $tmdbConfig->images->backdrop_sizes[
+        array_key_last($tmdbConfig->images->backdrop_sizes)
+    ];
+    foreach ($movieImages->backdrops as $i => $image) {
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
+        $imagePath = $outdir
+            . 'backdrop' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
+        if (!file_exists($imagePath)) {
+            file_put_contents($imagePath, file_get_contents($url));
+        }
+        if (!$allImages) {
+            break;
         }
     }
 }

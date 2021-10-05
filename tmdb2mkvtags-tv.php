@@ -84,6 +84,12 @@ if ($apiToken === null) {
 if ($includeAdult === null) {
     $includeAdult = 'true';
 }
+if ($imageSizeOriginal === null) {
+    $imageSizeOriginal = false;
+}
+if ($allImages === null) {
+    $allImages = false;
+}
 
 
 $shows = queryTmdb(
@@ -234,16 +240,16 @@ if ($outdir === '-') {
     fwrite(STDERR, "Not downloading images\n");
 } else {
     if ($outdir === null) {
-        $outdir = trim(str_replace('/', ' ', $show->name))
-            . '/' . trim(str_replace('/', ' ', $seasonDetails->name))
-            . '/' . trim(str_replace('/', ' ', $episodeDetails->name));
+        $showdir = trim(str_replace('/', ' ', $show->name)) . '/';
+        $seasondir = trim(str_replace('/', ' ', $seasonDetails->name)) . '/';
+        $outdir = $showdir . $seasondir
+            . sprintf('%02d', $episodeDetails->episode_number) . ' - ' . trim(str_replace('/', ' ', $episodeDetails->name));
     }
     $outdir = rtrim($outdir, '/') . '/';
     if (is_file($outdir)) {
         fwrite(STDERR, "Error: Output directory is a file\n");
         exit(2);
     }
-    fwrite(STDERR, $outdir);
     if (!is_dir($outdir)) {
         mkdir($outdir, recursive: true);
     }
@@ -335,25 +341,106 @@ if ($outdir === null) {
 
 
 if ($downloadImages) {
-    //we take the largest scaled image, not the original image
     $tmdbConfig = queryTmdb('3/configuration');
-    foreach ($tmdbConfig->images as $key => $sizes) {
-        if (is_array($sizes)) {
-            foreach ($sizes as $sizeKey => $value) {
-                if ($value == 'original') {
-                    unset($tmdbConfig->images->$key[$sizeKey]);
+
+    if (!$imageSizeOriginal) {
+        // we take the largest scaled image, not the original image
+        foreach ($tmdbConfig->images as $key => $sizes) {
+            if (is_array($sizes)) {
+                foreach ($sizes as $sizeKey => $value) {
+                    if ($value == 'original') {
+                        unset($tmdbConfig->images->$key[$sizeKey]);
+                    }
                 }
             }
         }
     }
 
-    if ($episodeDetails->still_path) {
-        $size = $tmdbConfig->images->poster_sizes[
-            array_key_last($tmdbConfig->images->poster_sizes)
-        ];
-        $url = $tmdbConfig->images->secure_base_url . $size . $episodeDetails->still_path;
+    // show images
+    // adding language to query excludes results without a language set
+    $showImages = queryTmdb('3/tv/' . $show->id . '/images');
+
+    // exclude images that have a language that doesn't match $language
+    foreach ($showImages as $type => $images) {
+        if (is_array($images)) {
+            foreach ($images as $key => $image) {
+                if ($image->iso_639_1 && $image->iso_639_1 != $language) {
+                    unset($images[$key]);
+                }
+            }
+            $showImages->$type = array_values($images);
+        }
+    }
+
+    $size = $tmdbConfig->images->poster_sizes[
+        array_key_last($tmdbConfig->images->poster_sizes)
+    ];
+    foreach ($showImages->posters as $i => $image) {
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
+        $imagePath = $showdir
+            . 'poster' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
+        if (!file_exists($imagePath)) {
+            file_put_contents($imagePath, file_get_contents($url));
+        }
+    }
+
+    $size = $tmdbConfig->images->logo_sizes[
+        array_key_last($tmdbConfig->images->logo_sizes)
+    ];
+    foreach ($showImages->logos as $i => $image) {
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
+        $imagePath = $showdir
+            . 'logo' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
+        if (!file_exists($imagePath)) {
+            file_put_contents($imagePath, file_get_contents($url));
+        }
+    }
+
+    $size = $tmdbConfig->images->backdrop_sizes[
+        array_key_last($tmdbConfig->images->backdrop_sizes)
+    ];
+    foreach ($showImages->backdrops as $i => $image) {
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
+        $imagePath = $showdir
+            . 'backdrop' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
+        if (!file_exists($imagePath)) {
+            file_put_contents($imagePath, file_get_contents($url));
+        }
+    }
+
+    // season images
+    // adding language to query excludes results without a language set
+    $seasonImages = queryTmdb('3/tv/' . $show->id . '/season/' . $season . '/images');
+    $size = $tmdbConfig->images->poster_sizes[
+        array_key_last($tmdbConfig->images->poster_sizes)
+    ];
+    foreach ($seasonImages->posters as $i => $image) {
+        if ($image->iso_639_1 && $image->iso_639_1 != $language) {
+            // exclude images that have a language that doesn't match $language
+            continue;
+        }
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
+        $imagePath = $showdir . $seasondir
+            . 'poster' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
+        if (!file_exists($imagePath)) {
+            file_put_contents($imagePath, file_get_contents($url));
+        }
+    }
+
+    // episode images
+    // adding language to query excludes results without a language set
+    $episodeImages = queryTmdb('3/tv/' . $show->id . '/season/' . $season . '/episode/' . $episode . '/images');
+    $size = $tmdbConfig->images->still_sizes[
+        array_key_last($tmdbConfig->images->still_sizes)
+    ];
+    foreach ($episodeImages->stills as $i => $image) {
+        if ($image->iso_639_1 && $image->iso_639_1 != $language) {
+            // exclude images that have a language that doesn't match $language
+            continue;
+        }
+        $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
         $imagePath = $outdir
-            . 'cover.' . pathinfo($episodeDetails->still_path, PATHINFO_EXTENSION);
+            . 'cover' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
         if (!file_exists($imagePath)) {
             file_put_contents($imagePath, file_get_contents($url));
         }
