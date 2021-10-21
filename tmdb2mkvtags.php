@@ -244,20 +244,7 @@ if ($downloadImages) {
         }
     }
 
-    // adding language to query excludes results without a language set
-    $movieImages = queryTmdb('3/movie/' . $movie->id . '/images');
-
-    // exclude images that have a language that doesn't match $language
-    foreach ($movieImages as $type => $images) {
-        if (is_array($images)) {
-            foreach ($images as $key => $image) {
-                if ($image->iso_639_1 && $image->iso_639_1 != $language) {
-                    unset($images[$key]);
-                }
-            }
-            $movieImages->$type = array_values($images);
-        }
-    }
+    $movieImages = queryTmdb('3/movie/' . $movie->id . '/images?include_image_language=' . $language . ',null');
 
     $size = $tmdbConfig->images->poster_sizes[
         array_key_last($tmdbConfig->images->poster_sizes)

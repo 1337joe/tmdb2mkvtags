@@ -357,20 +357,7 @@ if ($downloadImages) {
     }
 
     // show images
-    // adding language to query excludes results without a language set
-    $showImages = queryTmdb('3/tv/' . $show->id . '/images');
-
-    // exclude images that have a language that doesn't match $language
-    foreach ($showImages as $type => $images) {
-        if (is_array($images)) {
-            foreach ($images as $key => $image) {
-                if ($image->iso_639_1 && $image->iso_639_1 != $language) {
-                    unset($images[$key]);
-                }
-            }
-            $showImages->$type = array_values($images);
-        }
-    }
+    $showImages = queryTmdb('3/tv/' . $show->id . '/images?include_image_language=' . $language . ',null');
 
     $size = $tmdbConfig->images->poster_sizes[
         array_key_last($tmdbConfig->images->poster_sizes)
@@ -409,16 +396,11 @@ if ($downloadImages) {
     }
 
     // season images
-    // adding language to query excludes results without a language set
-    $seasonImages = queryTmdb('3/tv/' . $show->id . '/season/' . $season . '/images');
+    $seasonImages = queryTmdb('3/tv/' . $show->id . '/season/' . $season . '/images?include_image_language=' . $language . ',null');
     $size = $tmdbConfig->images->poster_sizes[
         array_key_last($tmdbConfig->images->poster_sizes)
     ];
     foreach ($seasonImages->posters as $i => $image) {
-        if ($image->iso_639_1 && $image->iso_639_1 != $language) {
-            // exclude images that have a language that doesn't match $language
-            continue;
-        }
         $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
         $imagePath = $showdir . $seasondir
             . 'poster' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
@@ -428,16 +410,11 @@ if ($downloadImages) {
     }
 
     // episode images
-    // adding language to query excludes results without a language set
-    $episodeImages = queryTmdb('3/tv/' . $show->id . '/season/' . $season . '/episode/' . $episode . '/images');
+    $episodeImages = queryTmdb('3/tv/' . $show->id . '/season/' . $season . '/episode/' . $episode . '/images?include_image_language=' . $language . ',null');
     $size = $tmdbConfig->images->still_sizes[
         array_key_last($tmdbConfig->images->still_sizes)
     ];
     foreach ($episodeImages->stills as $i => $image) {
-        if ($image->iso_639_1 && $image->iso_639_1 != $language) {
-            // exclude images that have a language that doesn't match $language
-            continue;
-        }
         $url = $tmdbConfig->images->secure_base_url . $size . $image->file_path;
         $imagePath = $outdir
             . 'cover' . ($i > 0 ? $i : '') . '.' . pathinfo($image->file_path, PATHINFO_EXTENSION);
